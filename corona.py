@@ -25,18 +25,20 @@ def fit_expo(x,y):
 
 now         = datetime.now() 
 date        = now.strftime("%Y-%m-%d") 
-date        = '2020-03-29'  #hard coded
+###comment out following line for current data (if already available)
+date        = '2020-03-30'  #hard coded
+####################################################################
 url         = "https://www.ecdc.europa.eu/sites/default/files/documents/COVID-19-geographic-disbtribution-worldwide-"
 url         = url +date+".xlsx"
 
 df          = pd.read_excel(url)
-country     = 'Italy' #e.g. South Korea,China, United_States_of_America,United_Kingdom, Italy, Austria
+country     = 'Denmark' #e.g. South_Korea,China, United_States_of_America,United_Kingdom, Italy, Austria
 df_filtered = df[df['countriesAndTerritories'] == country]  
 #until 2020-03-26  'Countries and territories'
 
 #df_filtered['Cases'].describe()  # describtive statistics
 
-timeSpan    = 7*5  # last month
+timeSpan    = 7*5  # last 5 weeks
 dates       = np.array(df_filtered['dateRep'][0:timeSpan],dtype='datetime64[D]')
 #until 2020-03-26   'DateRep'
 
@@ -44,7 +46,7 @@ dates       = dates[::-1]
 newCases    = np.array(df_filtered['cases'])[0:timeSpan] 
 #unitl 2020-03-26    'Cases'                       
 newCases    = newCases[::-1]  #reverse order 
-allCases    = np.cumsum(newCases)
+allCases    = np.cumsum(newCases)+1e-10  #add small bias to avoid zeros in the data
 xTicks      = np.arange(np.size(newCases))
 
 ######## fit over whole time span   ##########
@@ -53,7 +55,7 @@ params,_, _ = fit_expo(xTicks,allCases)
 plt.plot(xTicks, params[0]*np.exp(params[1]*xTicks),'r--', linewidth = 4, label = 'whole time span')
 
 ######## sliding fit ###########
-fittedDays   = 5
+fittedDays   = 7
 n            = timeSpan-fittedDays+1  #samples for sliding fit
 
 colorMap     = cm.rainbow(np.linspace(1,0,n)) #e.g. rainbow, magma
@@ -105,6 +107,7 @@ plt.figure(4)
 xVal = savgol_filter(allCases, 5, 3)   #filter length, filter order
 yVal = savgol_filter(newCases, 5, 3)
 plt.loglog(xVal,yVal)
+plt.title(country.replace('_',' '), fontsize = 26)
 plt.xlim((100,max(xVal)*1.1))
 plt.ylim((10,max(xVal)*1.1))
 plt.xlabel('all cases')
