@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 from matplotlib.pyplot import cm
 from scipy.optimize import curve_fit
 from scipy.signal import savgol_filter
+from scipy.stats import gamma
 import seaborn as sns
 sns.set()
 sns.set_context("notebook",font_scale=1.8)
@@ -26,19 +27,19 @@ def fit_expo(x,y):
 now         = datetime.now() 
 date        = now.strftime("%Y-%m-%d") 
 ###comment out following line for current data (if already available)
-date        = '2020-03-30'  #hard coded
+date        = '2020-04-26'  #hard coded
 ####################################################################
 url         = "https://www.ecdc.europa.eu/sites/default/files/documents/COVID-19-geographic-disbtribution-worldwide-"
 url         = url +date+".xlsx"
 
 df          = pd.read_excel(url)
-country     = 'Denmark' #e.g. South_Korea,China, United_States_of_America,United_Kingdom, Italy, Austria
+country     = 'Sweden' #e.g. South_Korea,China, United_States_of_America,United_Kingdom, Italy, Austria
 df_filtered = df[df['countriesAndTerritories'] == country]  
 #until 2020-03-26  'Countries and territories'
 
 #df_filtered['Cases'].describe()  # describtive statistics
 
-timeSpan    = 7*5  # last 5 weeks
+timeSpan    = 7*8#7*5  # last 5 weeks
 dates       = np.array(df_filtered['dateRep'][0:timeSpan],dtype='datetime64[D]')
 #until 2020-03-26   'DateRep'
 
@@ -55,7 +56,7 @@ params,_, _ = fit_expo(xTicks,allCases)
 plt.plot(xTicks, params[0]*np.exp(params[1]*xTicks),'r--', linewidth = 4, label = 'whole time span')
 
 ######## sliding fit ###########
-fittedDays   = 7
+fittedDays   = 5
 n            = timeSpan-fittedDays+1  #samples for sliding fit
 
 colorMap     = cm.rainbow(np.linspace(1,0,n)) #e.g. rainbow, magma
@@ -109,7 +110,55 @@ yVal = savgol_filter(newCases, 5, 3)
 plt.loglog(xVal,yVal)
 plt.title(country.replace('_',' '), fontsize = 26)
 plt.xlim((100,max(xVal)*1.1))
-plt.ylim((10,max(xVal)*1.1))
+plt.ylim((10,10**np.ceil(np.log10(np.max(yVal)))))
 plt.xlabel('all cases')
 plt.ylabel('new cases')
 plt.grid(True)
+
+
+
+### effective re-production
+
+tau     = 5#13    #tau equals number of fitted days
+a       = 1
+b       = 5
+
+n       = timeSpan-tau + 1  #samples for fit
+repVec  = np.zeros((n,))
+
+for d in np.arange(1,n):   
+    ii  = np.arange(d,d+tau)
+    y   = newCases[ii]
+
+    num         = a+ np.sum(y)
+ 
+    s           = np.arange(0,d+tau)
+    ws          = gamma.pdf(s,a=3,loc=0,scale=1)  # gamma parameters to play around
+    ws          = ws/np.sum(ws)
+
+    
+    sum_di      = 0 
+    for i in ii:
+        w       = np.reshape(ws[:i:],(-1,1))
+        w       = w[::-1]
+        ys      = np.reshape(newCases[:i:],(1,-1))
+        sum_di  += ys@w
+        
+        
+        #unifrom dist.
+        #sum_di  += np.mean(ys)
+                        
+    den         = 1/b +  sum_di
+
+    repVec[d]   = num/den                
+                           
+plt.figure(5)
+plt.plot(xTicks[tau::], repVec[1::], linewidth = '2')
+plt.xticks(xTicks[tau::3], dates[fittedDays::3], rotation=30)
+plt.ylabel('effective re-production', fontsize = 22)
+plt.axhline(1, 0, 1,c='r', label='pandemic stop')
+plt.title(country.replace('_',' '), fontsize = 26)
+plt.grid(True)
+plt.ylim([0, 5])
+plt.show()
+ 
